@@ -24,3 +24,22 @@ def _random_string(use_cyrillic: bool) -> str:
         characters[position] = character
 
     return "".join(characters)
+
+
+random_student_name = _random_string(use_cyrillic=True)
+random_student_email = _random_string(use_cyrillic=False).lower()
+random_updated_student_name = _random_string(use_cyrillic=True)
+random_updated_student_email = _random_string(use_cyrillic=False).lower()
+random_student_phone = "".join(secrets.choice(DIGITS) for _ in range(10))
+
+# Редактируемые шаблоны тестовых данных студента.
+student_name = f"Студент_{random_student_name}"
+student_email = f"student_{random_student_email}@test.com"
+student_phone_no = f"+7{random_student_phone}"
+student_gender = "male"
+student_status = 1
+
+updated_student_name = f"Обновлённый_студент_{random_updated_student_name}"
+updated_student_email = f"updated_student_{random_updated_student_email}@test.com"
+updated_student_gender = "female"
+updated_student_status = 1
