@@ -46,17 +46,15 @@ def _patch_allure_results() -> list[Path]:
                 child_steps = step.get("steps", [])
                 if isinstance(child_steps, list):
                     mark_parent_steps_failed(child_steps)
-                    if any(child.get("status") == "failed" for child in child_steps):
+                    if any(child.get("status") in {"failed", "broken"} for child in child_steps):
                         step["status"] = "failed"
+                        step.pop("statusDetails", None)
 
         steps = result.get("steps", [])
         if isinstance(steps, list):
             mark_parent_steps_failed(steps)
 
-        status_details = result.get("statusDetails", {})
-        if isinstance(status_details, dict) and str(status_details.get("message", "")).startswith(
-            "AssertionError: FAILURE:"
-        ):
+        if any(step.get("status") in {"failed", "broken"} for step in steps):
             result.pop("statusDetails", None)
 
         result["labels"] = [

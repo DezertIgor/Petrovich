@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import allure
@@ -11,10 +13,45 @@ MAX_RESPONSE_TIME_SECONDS = 3.0
 MAX_RESPONSE_SIZE_KB = 501.0
 
 
+@dataclass(frozen=True)
+class ExpectedCondition:
+    """Условие проверки и его информативное представление в Allure."""
+
+    description: Any
+    predicate: Callable[[Any], bool]
+
+
+def _prepare_expected_value(expected_value: Any) -> Any:
+    """Подготовить ожидаемое значение для JSON-вложения Allure."""
+    if isinstance(expected_value, ExpectedCondition):
+        return _prepare_expected_value(expected_value.description)
+    if callable(expected_value):
+        raise TypeError("Для проверки по условию используйте ExpectedCondition с информативным описанием")
+    if isinstance(expected_value, dict):
+        return {key: _prepare_expected_value(value) for key, value in expected_value.items()}
+    if isinstance(expected_value, list):
+        return [_prepare_expected_value(value) for value in expected_value]
+    return expected_value
+
+
+def _format_response_info(metadata: dict[str, Any], body: dict[str, Any]) -> str:
+    """Сформировать JSON с одной пустой строкой между метаданными и телом."""
+    return (
+        "{\n"
+        + ",\n\n".join(
+            json.dumps(section, ensure_ascii=False, indent=2).split("\n", maxsplit=1)[1].rsplit("\n", maxsplit=1)[0]
+            for section in (metadata, body)
+        )
+        + "\n}"
+    )
+
+
 def _assert_expected_value(actual_value: Any, expected_value: Any) -> None:
     """Рекурсивная проверка ожидаемых полей и значений."""
-    if callable(expected_value):
-        assert expected_value(actual_value)
+    if isinstance(expected_value, ExpectedCondition):
+        assert expected_value.predicate(actual_value)
+    elif callable(expected_value):
+        raise TypeError("Для проверки по условию используйте ExpectedCondition с информативным описанием")
     elif isinstance(expected_value, dict):
         assert isinstance(actual_value, dict)
         for key, nested_expected_value in expected_value.items():
@@ -74,23 +111,12 @@ class Api:
             "response_time_ms": round(response.elapsed.total_seconds() * 1000, 2),
             "response_size_kb": round(len(response.content) / 1024, 2),
         }
-
-        response_headers_info = {}
-        for header_name in ("id", "Server-Timing", "traceparent"):
-            header_value = response.headers.get(header_name)
-            response_headers_info[header_name] = "Поле не найдено" if header_value is None else header_value
-
-        response_sections = [response_metadata, response_headers_info]
-        if response_body_info:
-            response_sections.append(response_body_info)
-        response_info = (
-            "{\n"
-            + ",\n\n".join(
-                json.dumps(section, ensure_ascii=False, indent=2).split("\n", maxsplit=1)[1].rsplit("\n", maxsplit=1)[0]
-                for section in response_sections
-            )
-            + "\n}"
+        expected_response_info = json.dumps(
+            _prepare_expected_value(expected_body),
+            ensure_ascii=False,
+            indent=2,
         )
+        actual_response_info = _format_response_info(response_metadata, response_body_info)
 
         allure.attach(
             json.dumps(
@@ -107,8 +133,13 @@ class Api:
             allure.attachment_type.JSON,
         )
         allure.attach(
-            response_info,
-            "Ответ",
+            expected_response_info,
+            "Ожидаемый ответ",
+            allure.attachment_type.JSON,
+        )
+        allure.attach(
+            actual_response_info,
+            "Фактический ответ",
             allure.attachment_type.JSON,
         )
 
