@@ -1,0 +1,15 @@
+# Default to LF for all text files.
+* text=auto eol=lf
+
+# Preserve binary files.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.whl binary
